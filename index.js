@@ -1,22 +1,64 @@
 const mqtt = require("mqtt");
 require("dotenv").config();
-const config = require("./config/mqtt");
-// var nhc2 = new nhc2.NHC2("mqtts://10.0.1.50", {
-//   port: 8884,
-//   clientId: "PhilMacbook",
-//   username: "hobby",
-//   password:
-//     "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJob2JieSIsImlhdCI6MTU3NDQ0ODMxNSwiZXhwIjoxNjA2MDcwNzE1LCJyb2xlIjpbImhvYmJ5Il0sImF1ZCI6IkZQMDAxMTJBMjI1RjMyIiwiaXNzIjoibmhjLWNvcmUiLCJqdGkiOiJlNWNmMmI5MS04NjQ2LTRjOWItODI0NC1mYzc2YjM3ZTFkYTIifQ.ckKF1siWenP1heJYW_UDVFmkp2RCMQAION1T0FNE9vZ1mHr-Nd88XkJwPPPeTZHnKi02Y_yFPxz69Jq9rbJQpOZ45S0tOWgFKSL3-QDcTpIAljVBVMtLY9nvPT6aLfMef8y1ThupLnVKy6WFM-VoUgMIMD0fuCFWJ_h5AKadstB001HHmeJaBiTV-vlJIf95L5iUduwrPtJ0EMgzpndhFVWP_KIw0YWAtGksiKGyEdoNo9R5n0G_k0N18FaH8lHjn5Yga657_27UY8gz0TIff2FWUm_ZEV1kblrrHDc41JrtqhiaX7E7CLUe-EPWwZU_owg_8JLz7fubodQ7EnHMDA",
-//   rejectUnauthorized: false
-// });
-
-console.log(config.options);
-
-client = mqtt.connect(config.url, config.options);
+const config = require("./config/config");
+const nikoParser = require("./helpers/nikoParser");
+const setNewTemp = require("./models/thermostat");
+const amqp = require("amqplib");
+//For debug
+const util = require("util");
+console.log("     -- NIKO HOBBY API --");
+console.log("");
+//
+//Setup mqtt for NIKO HOME CONTROL
+//
+client = mqtt.connect(config.mqtt.url, config.mqtt.options);
 
 client.on("connect", function() {
-  console.log("Connected");
-  client.subscribe("hobby/control/devices/#");
+  console.log("[*] - NIKO Connected Locally");
+  amqp.connect(config.rabbitmqUrl).then(function(conn) {
+    process.once("SIGINT", function() {
+      conn.close();
+    });
+    return conn.createChannel().then(function(ch) {
+      console.log("[*] - AMQP Connected to server");
+      var ok = ch.assertQueue("philPerso", { durable: true });
+      ok = ok.then(function() {
+        ch.prefetch(1);
+      });
+      ok = ok.then(function() {
+        ch.consume("philPerso", doWork, { noAck: false });
+        console.log("[*] - Waiting for messages. To exit press CTRL+C");
+      });
+      return ok;
+
+      function doWork(msg) {
+        let body = msg.content.toString();
+        let payload = JSON.parse(body);
+        if (payload.temp < 17) {
+          console.log("[Too Cold] -- Switch on heating !");
+          let { topic, data } = setNewTemp(
+            25,
+            60,
+            "True",
+            "27602995-f7bc-4e10-9e7c-8dabdf5e0400"
+          );
+          //console.log(topic, data);
+          client.publish(topic, data);
+        } else {
+          console.log("[Temperature OK]");
+          let { topic, data } = setNewTemp(
+            18,
+            0,
+            "False",
+            "27602995-f7bc-4e10-9e7c-8dabdf5e0400"
+          );
+          //console.log(topic, data);
+          client.publish(topic, data);
+        }
+        ch.ack(msg);
+      }
+    });
+  });
 });
 
 client.on("error", function() {
@@ -27,7 +69,6 @@ client.on("offline", function() {
   console.log("Disconnected");
 });
 
-client.on("message", function(topic, message) {
-  console.log("topic", topic);
-  console.log("message", message.toString());
-});
+//
+//SETUP AMQP for incoming messages
+//

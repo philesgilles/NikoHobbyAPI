@@ -1,0 +1,11 @@
+version: "3.3"
+
+services:
+  niko_api:
+    container_name: "Niko-Hobby-API"
+    build: .
+    environment:
+      env: "dev"
+    volumes:
+      - ".:/app"
+      - "/app/node_modules"
