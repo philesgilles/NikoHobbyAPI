@@ -48,10 +48,9 @@ client = mqtt.connect(config.mqtt.url, config.mqtt.options);
         const hours = time.getHours();
         //const minutes = time.getMinutes();
         const day = time.getDay();
-        console.log(`Temperature = [${payload.temp} °C]`);
         if ((hours < 4 || hours > 17) || ((day === 6 || day === 0) && (hours >= 10 && hours < 14 ))) {
           if (payload.temp < 18.5) {
-            console.log(printDate + " [Too Cold] -- Switch ON heating !");
+            console.log(`${printDate} - [${payload.temp}°C] || Switch ON heating !`);
             let { topic, data } = setNewTemp(
               25,
               60,
@@ -61,7 +60,7 @@ client = mqtt.connect(config.mqtt.url, config.mqtt.options);
             //console.log(topic, data);
             client.publish(topic, data);
           } else if (payload.temp > 21) {
-            console.log(printDate + " [Temperature HIGH] -- Switch OFF heating !");
+            console.log(`${printDate} - [${payload.temp}°C] || Switch OFF heating !`);
             let { topic, data } = setNewTemp(
               18,
               0,
@@ -71,10 +70,10 @@ client = mqtt.connect(config.mqtt.url, config.mqtt.options);
             //console.log(topic, data);
             client.publish(topic, data);
           } else {
-            console.log(printDate + " [Temperature OK] -- Do Nothing !");
+            console.log(`${printDate} - [${payload.temp}°C] || Do Nothing !`);
           }
         } else {
-          console.log(printDate + " [NOT TIME] -- Automatic");
+          console.log(`${printDate} - [${payload.temp}°C] || Automatic`);
         }
         ch.ack(msg);
       }
