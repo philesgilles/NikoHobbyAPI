@@ -49,7 +49,7 @@ client = mqtt.connect(config.mqtt.url, config.mqtt.options);
         //const minutes = time.getMinutes();
         const day = time.getDay();
         console.log(day, hours);
-        if ((hours < 5 || hours > 18) || ((day === 6 || day === 0) && (hours >= 10 && hours < 15 ))) {
+        if ((hours < 5 || hours > 18) || ((day === 6 || day === 0) && (hours >= 11 && hours < 15 ))) {
           if (payload.temp < 18.5) {
             console.log(printDate + " [Too Cold] -- Switch ON heating !");
             let { topic, data } = setNewTemp(
